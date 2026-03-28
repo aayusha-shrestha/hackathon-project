@@ -84,10 +84,17 @@
 }
 
 .heroImagePlaceholder {
-  width: 400px;
-  height: 320px;
-  background: linear-gradient(135deg, var(--color-primary-light), var(--color-seeker-green-light));
-  border-radius: var(--radius-xl);
+  width: 100%;          /* container width */
+  height: 500px;        /* or whatever height you want */
+  overflow: hidden;     /* hide overflow if image is bigger */
+}
+
+.heroImagePlaceholder img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;    /* cover fills the div, keeping aspect ratio */
+  object-position: center; /* centers the image */
+  border-radius: 50px;
 }
 
 /* Sections */

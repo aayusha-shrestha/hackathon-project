@@ -49,7 +49,9 @@ export default function LandingPage() {
           </div>
         </div>
         <div className={styles.heroImage}>
-          <div className={styles.heroImagePlaceholder} />
+          <div className={styles.heroImagePlaceholder} >
+            <img src="/images/a.jpg" alt="Hero" />
+          </div>
         </div>
       </section>
 

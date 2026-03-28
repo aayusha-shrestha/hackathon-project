@@ -5,8 +5,8 @@
 }
 
 :root {
-  --color-primary: #1B4FFF;
-  --color-primary-hover: #1640D6;
+  --color-primary: #3c676e;
+  --color-primary-hover: #66858a;
   --color-primary-light: #EEF2FF;
   --color-seeker-green: #0F6E56;
   --color-seeker-green-dark: #0A4F3D;
@@ -34,7 +34,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   color: var(--color-text-primary);
   background-color: var(--color-background);
