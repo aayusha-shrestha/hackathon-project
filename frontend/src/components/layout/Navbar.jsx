@@ -9,11 +9,6 @@ export default function Navbar() {
         <span className={styles.logoIcon}>+</span>
         <span className={styles.logoName}>Mental Wizard</span>
       </button>
-      <div className={styles.links}>
-        <Link to="#features" className={styles.link}>Features</Link>
-        <Link to="#how-it-works" className={styles.link}>How It Works</Link>
-        <Link to="#community" className={styles.link}>Community</Link>
-      </div>
       <div className={styles.ctaGroup}>
         <button className={styles.emergencyBtn} onClick={() => navigate('/emergency')}>
           🚨 Emergency
