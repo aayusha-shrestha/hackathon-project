@@ -1,36 +1,9 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../../components/layout/AppLayout';
+import { useAuth } from '../../context/AuthContext';
+import { getPendingRequests } from '../../api/endpoints';
 import styles from './HelperDashboard.module.css';
-
-const incomingRequests = [
-  {
-    id: 'r1',
-    anonId: '9921',
-    timeAgo: 'Received 2m ago',
-    urgency: 'high',
-    urgencyLabel: 'High Urgency',
-    snippet: 'Feeling overwhelmed with work stress and sudden anxiety peaks during meetings.',
-    tags: ['Work', 'Stress', 'Anxiety'],
-  },
-  {
-    id: 'r2',
-    anonId: '1042',
-    timeAgo: 'Received 14m ago',
-    urgency: 'moderate',
-    urgencyLabel: 'Moderate',
-    snippet: 'Difficulties maintaining routine sleep hygiene, feeling lethargic.',
-    tags: ['Sleep', 'Lifestyle'],
-  },
-  {
-    id: 'r3',
-    anonId: '8834',
-    timeAgo: 'Received 45m ago',
-    urgency: 'low',
-    urgencyLabel: 'Low Urgency',
-    snippet: 'Seeking general guidance on mindfulness techniques for daily focus.',
-    tags: ['Wellness', 'Focus'],
-  },
-];
 
 const activeSessions = [
   { id: 's1', userId: '88219', initials: 'JD', duration: 'Connected for 42m', snippet: '"Thank you for the breathing exercises, I feel a bit more..."' },
@@ -40,13 +13,32 @@ const activeSessions = [
 
 export default function HelperDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+
+  useEffect(() => {
+    async function fetchPending() {
+      if (!user?.userId) return;
+      try {
+        const data = await getPendingRequests(user.userId);
+        setPendingRequests(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Failed to fetch pending requests:', err);
+        setPendingRequests([]);
+      } finally {
+        setLoadingRequests(false);
+      }
+    }
+    fetchPending();
+  }, [user?.userId]);
 
   return (
     <AppLayout role="helper">
       <div className={styles.page}>
         {/* Header */}
         <header className={styles.header}>
-          <h1 className={styles.welcomeTitle}>Welcome back, Dr. Aris</h1>
+          <h1 className={styles.welcomeTitle}>Welcome back, {user?.username || 'Helper'}</h1>
           <p className={styles.welcomeSub}>Your clinical overview for today.</p>
         </header>
 
@@ -89,38 +81,41 @@ export default function HelperDashboard() {
           <section className={styles.requestsSection}>
             <div className={styles.sectionHeader}>
               <h2 className={styles.sectionTitle}>Incoming Requests</h2>
-              <span className={styles.newBadge}>3 New Requests</span>
+              <span className={styles.newBadge}>{pendingRequests.length} Pending</span>
             </div>
             <div className={styles.requestList}>
-              {incomingRequests.map((req) => (
+              {loadingRequests ? (
+                <p style={{ color: 'var(--color-text-muted)', padding: '16px' }}>Loading requests...</p>
+              ) : pendingRequests.length === 0 ? (
+                <p style={{ color: 'var(--color-text-muted)', padding: '16px' }}>No pending requests at the moment.</p>
+              ) : (
+                pendingRequests.map((req) => (
                 <div
-                  key={req.id}
-                  className={[styles.requestCard, styles[`urgency_${req.urgency}`]].join(' ')}
+                  key={req.session_id}
+                  className={[styles.requestCard, styles.urgency_moderate].join(' ')}
                 >
                   <div className={styles.requestTop}>
                     <div className={styles.requestMeta}>
-                      <span className={styles.reqAnon}>Anon #{req.anonId}</span>
-                      <span className={[styles.urgencyBadge, styles[`badge_${req.urgency}`]].join(' ')}>
+                      <span className={styles.reqAnon}>User #{req.user_id}</span>
+                      <span className={[styles.urgencyBadge, styles.badge_moderate].join(' ')}>
                         <span className={styles.urgencyDot} />
-                        {req.urgencyLabel}
+                        Pending
                       </span>
                     </div>
                     <button
                       className={styles.viewBriefBtn}
-                      onClick={() => navigate(`/helper/request/${req.id}`)}
+                      onClick={() => navigate(`/helper/request/${req.session_id}`)}
                     >
                       View Brief <span>›</span>
                     </button>
                   </div>
-                  <p className={styles.reqSnippet}>{req.snippet}</p>
-                  <div className={styles.reqTags}>
-                    {req.tags.map((t) => (
-                      <span key={t} className={styles.reqTag}>{t}</span>
-                    ))}
-                  </div>
-                  <p className={styles.reqTime}>{req.timeAgo}</p>
+                  <p className={styles.reqSnippet}>Session ID: {req.session_id}</p>
+                  <p className={styles.reqTime}>
+                    {new Date(req.created_at).toLocaleString()}
+                  </p>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </section>
 

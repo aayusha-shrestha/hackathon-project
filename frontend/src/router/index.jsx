@@ -9,6 +9,7 @@ import SeekerDashboard from '../pages/SeekerDashboard';
 import AIChatPage from '../pages/AIChatPage';
 import ProfessionalSupportPage from '../pages/ProfessionalSupportPage';
 import SessionPage from '../pages/SessionPage';
+import EmergencyPage from '../pages/EmergencyPage';
 import HelperDashboard from '../pages/helper/HelperDashboard';
 import HelperAuthPage from '../pages/helper/HelperAuthPage';
 import RequestBriefPage from '../pages/helper/RequestBriefPage';
@@ -18,23 +19,27 @@ import HelperHistoryPage from '../pages/helper/HelperHistoryPage';
 function SeekerGuard({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user || user.role !== 'seeker') return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/auth" replace />;
+  if (user.role !== 'seeker') return <Navigate to="/" replace />;
   return children;
 }
 
 function HelperGuard({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user || user.role !== 'helper') return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/helper/auth" replace />;
+  if (user.role !== 'helper') return <Navigate to="/" replace />;
   return children;
 }
 
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
+  { path: '/auth', element: <AuthPage /> },
   { path: '/signup', element: <AuthPage /> },
   { path: '/login', element: <AuthPage /> },
   { path: '/helper/login', element: <HelperAuthPage /> },
   { path: '/helper/signup', element: <HelperAuthPage /> },
+  { path: '/helper/auth', element: <HelperAuthPage /> },
   { path: '/onboarding', element: <OnboardingPage /> },
   { path: '/onboarding/results', element: <OnboardingResultsPage /> },
   {
@@ -52,6 +57,10 @@ export const router = createBrowserRouter([
   {
     path: '/session/:sessionId',
     element: <SeekerGuard><SessionPage /></SeekerGuard>,
+  },
+  {
+    path: '/emergency',
+    element: <EmergencyPage />,
   },
   {
     path: '/helper/dashboard',

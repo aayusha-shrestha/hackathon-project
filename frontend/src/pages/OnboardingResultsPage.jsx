@@ -6,18 +6,18 @@ import styles from './OnboardingResultsPage.module.css';
 export default function OnboardingResultsPage() {
   const navigate = useNavigate();
   const { answers } = useOnboarding();
-  const { loginAsSeeker } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   const handleGoToDashboard = () => {
-    const anonId = Math.floor(1000 + Math.random() * 9000).toString();
-    loginAsSeeker(anonId, 'mock-token');
+    // User should already be authenticated after signup/login
+    // Just navigate to dashboard
     navigate('/dashboard');
   };
 
   return (
     <div className={styles.page}>
       <div className={styles.topBar}>
-        <div className={styles.anonId}>Anon #4821</div>
+        <div className={styles.anonId}>Anon #{user?.anonId ?? '4821'}</div>
         <div className={styles.actions}>
           <button className={styles.helpBtn}>?</button>
           <div className={styles.avatar} />

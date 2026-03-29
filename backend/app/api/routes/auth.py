@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from app.models import User
-from app.api.deps import get_db, get_current_user
-from app.schemas import UserRegisterSchema,UserLoginSchema, Token, RefreshTokenRequest
+from app.models import User, Helper
+from app.api.deps import get_db, get_current_user, get_current_helper
+from app.schemas import UserRegisterSchema, UserLoginSchema, Token, RefreshTokenRequest, HelperRegisterSchema
 from app.api.routes import crud
 from app.core.security import create_access_token, create_refresh_token, token_expired, decode_token
 # from app.utils import generate_new_account_email, send_email
@@ -81,6 +81,57 @@ async def refresh_access_token(refresh_token_request: RefreshTokenRequest,db:Ses
 @router.get("/users/me", status_code=status.HTTP_200_OK)
 def read_users_me(current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     return {
+        "user_id": current_user.user_id,
         "username": current_user.username,
         "email": current_user.email,
     }
+
+
+# ── Helper Auth Routes ──
+
+@router.post("/helper/register", status_code=status.HTTP_201_CREATED)
+def register_helper(data: HelperRegisterSchema, db: Session = Depends(get_db)):
+    existing = crud.get_helper_by_email(db=db, email=data.email)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A helper with this email already exists"
+        )
+    helper = crud.create_helper(
+        db=db,
+        username=data.username,
+        email=data.email,
+        password=data.password,
+        domain_expertise=data.domain_expertise,
+    )
+    return {
+        "message": "Helper Registered Successfully",
+        "helper": {
+            "helper_id": helper.helper_id,
+            "username": helper.username,
+            "email": helper.email,
+        }
+    }
+
+@router.post("/helper/login/access-token", status_code=status.HTTP_200_OK)
+def helper_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> Token:
+    helper = crud.authenticate_helper(db=db, email=form_data.username, password=form_data.password)
+    if not helper:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(data={"sub": helper.email, "role": "helper"})
+    refresh_token = create_refresh_token(data={"sub": helper.email, "role": "helper"})
+    return Token(access_token=access_token, refresh_token=refresh_token, token_type="bearer")
+
+@router.get("/helper/me", status_code=status.HTTP_200_OK)
+def read_helper_me(current_helper: Helper = Depends(get_current_helper), db: Session = Depends(get_db)):
+    return {
+        "helper_id": current_helper.helper_id,
+        "username": current_helper.username,
+        "email": current_helper.email,
+        "domain_expertise": current_helper.domain_expertise.value,
+    }
+

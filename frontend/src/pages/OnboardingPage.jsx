@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOnboarding } from '../context/OnboardingContext';
+import { useAuth } from '../context/AuthContext';
+import { storeAssessments, submitInitialAssessment, getErrorMessage } from '../api/endpoints';
 import styles from './OnboardingPage.module.css';
 
 const STEPS = [
@@ -59,13 +62,46 @@ const STEPS = [
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const { answers, currentStep, setAnswer, nextStep, prevStep } = useOnboarding();
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  
   const step = STEPS[currentStep];
   const total = STEPS.length;
   const isLast = currentStep === total - 1;
   const pct = Math.round(((currentStep + 1) / total) * 100);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (isLast) {
+      // Submit assessment to backend
+      if (user?.userId) {
+        setIsSubmitting(true);
+        setError(null);
+        try {
+          // Format answers as Q&A pairs for storing
+          const assessmentItems = STEPS.map(s => ({
+            question: s.question,
+            answer: answers[s.id] || 'skipped',
+          }));
+          
+          // Store individual Q&A pairs in UserAssessment table
+          await storeAssessments(assessmentItems);
+          
+          // Format as conversation string for analysis
+          const conversationString = assessmentItems
+            .map(item => `Q: ${item.question}\nA: ${item.answer}`)
+            .join('\n\n');
+          
+          // Analyze and create initial_assessment
+          await submitInitialAssessment(conversationString);
+        } catch (err) {
+          console.error('Failed to submit assessment:', err);
+          // Continue to results even if submission fails
+          setError(getErrorMessage(err));
+        } finally {
+          setIsSubmitting(false);
+        }
+      }
       navigate('/onboarding/results');
     } else {
       nextStep();
@@ -141,22 +177,31 @@ export default function OnboardingPage() {
         <button
           className={styles.backBtn}
           onClick={prevStep}
-          disabled={currentStep === 0}
+          disabled={currentStep === 0 || isSubmitting}
         >
           ← Back
         </button>
         <div className={styles.footerRight}>
-          <button className={styles.skipBtn} onClick={handleContinue}>
+          <button className={styles.skipBtn} onClick={handleContinue} disabled={isSubmitting}>
             Skip for now <span className={styles.skipArrow}>→</span>
           </button>
           <button
             className={styles.continueBtn}
             onClick={handleContinue}
+            disabled={isSubmitting}
           >
-            {isLast ? 'See My Results' : 'Continue'} →
+            {isSubmitting ? 'Saving...' : isLast ? 'See My Results' : 'Continue'} →
           </button>
         </div>
       </footer>
+      
+      {/* Error display */}
+      {error && (
+        <div className={styles.errorToast}>
+          {error}
+          <button onClick={() => setError(null)}>×</button>
+        </div>
+      )}
     </div>
   );
 }

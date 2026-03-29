@@ -74,6 +74,7 @@ def get_chat_response(prompt: str, user_assessment: dict = None) -> str:
         concerns = user_assessment.get("mental_health_concerns", [])
         domain = user_assessment.get("domain", "general")
         primary = user_assessment.get("primary_concern", "")
+        summary = user_assessment.get("summary", "")
         
         personalized_context = f"""
 USER CONTEXT (keep this in mind but don't explicitly mention unless relevant):
@@ -81,6 +82,8 @@ USER CONTEXT (keep this in mind but don't explicitly mention unless relevant):
 - Related concerns: {', '.join(concerns) if concerns else 'Not specified'}
 - Life domain affected: {domain}
 - Support level needed: {criticality}
+- Summary: {summary}
+
 
 Tailor your response to be sensitive to these factors.
 

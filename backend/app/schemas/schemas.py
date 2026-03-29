@@ -45,3 +45,19 @@ class HelpRequestSchema(BaseModel):
     
 class AnalyzeRequest(BaseModel):
     conversation: str
+
+
+class AssessmentItem(BaseModel):
+    question: str
+    answer: str
+
+
+class AssessmentRequest(BaseModel):
+    assessments: list[AssessmentItem]
+
+
+class HelperRegisterSchema(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    domain_expertise: DomainExpertise = DomainExpertise.GENERAL

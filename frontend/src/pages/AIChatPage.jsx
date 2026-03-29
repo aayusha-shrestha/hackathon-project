@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../context/AuthContext';
+import { createChatSession, sendChatMessage, getSessionHistory, getErrorMessage } from '../api/endpoints';
 import styles from './AIChatPage.module.css';
 
 const QUICK_REPLIES = [
@@ -12,14 +13,12 @@ const QUICK_REPLIES = [
   'Something else',
 ];
 
-const initialMessages = [
-  {
-    id: 1,
-    from: 'ai',
-    text: "Hi there. I'm glad you're here. Based on what you shared during onboarding, it sounds like things have felt heavy lately. You don't have to carry that alone. What's been on your mind most today?",
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  },
-];
+const INITIAL_MESSAGE = {
+  id: 1,
+  from: 'ai',
+  text: "Hi there. I'm glad you're here. Based on what you shared during onboarding, it sounds like things have felt heavy lately. You don't have to carry that alone. What's been on your mind most today?",
+  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+};
 
 function formatDate() {
   return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -27,42 +26,119 @@ function formatDate() {
 
 export default function AIChatPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [messages, setMessages] = useState(initialMessages);
+  const [searchParams] = useSearchParams();
+  const { user, isAuthenticated } = useAuth();
+  const [messages, setMessages] = useState([INITIAL_MESSAGE]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(true);
+  const [sessionId, setSessionId] = useState(null);
+  const [error, setError] = useState(null);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Load existing session or create new one
+  useEffect(() => {
+    const initSession = async () => {
+      const existingSessionId = searchParams.get('session');
+      
+      if (existingSessionId) {
+        // Load existing session
+        setSessionId(existingSessionId);
+        try {
+          const data = await getSessionHistory(existingSessionId);
+          if (data.messages && data.messages.length > 0) {
+            const loadedMessages = data.messages.map((msg, index) => ({
+              id: index + 1,
+              from: msg.role === 'user' ? 'user' : 'ai',
+              text: msg.content,
+              time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            }));
+            setMessages(loadedMessages);
+            setShowQuickReplies(false);
+          }
+        } catch (err) {
+          console.error('Failed to load session:', err);
+          setError('Failed to load chat history');
+        }
+      }
+    };
+
+    if (isAuthenticated) {
+      initSession();
+    }
+  }, [searchParams, isAuthenticated]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const sendMessage = (text) => {
-    if (!text.trim()) return;
+  // Clear error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  const sendMessage = useCallback(async (text) => {
+    if (!text.trim() || isTyping || isCreatingSession) return;
+    
     const userMsg = {
       id: Date.now(),
       from: 'user',
       text: text.trim(),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
+    
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setShowQuickReplies(false);
     setIsTyping(true);
     inputRef.current?.focus();
 
-    setTimeout(() => {
+    try {
+      let currentSessionId = sessionId;
+      
+      // Create session if doesn't exist
+      if (!currentSessionId) {
+        setIsCreatingSession(true);
+        const sessionData = await createChatSession(text.trim());
+        currentSessionId = sessionData.session_id;
+        setSessionId(currentSessionId);
+        setIsCreatingSession(false);
+        // Update URL to include session ID (without full reload)
+        navigate(`/chat?session=${currentSessionId}`, { replace: true });
+      }
+
+      // Send message to API
+      const response = await sendChatMessage(currentSessionId, text.trim());
+      
       setIsTyping(false);
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         from: 'ai',
-        text: "That sounds really tough, and it's completely valid to feel that way. Sometimes just naming what's going on is the first step. Can you tell me a little more about what's been weighing on you most?",
+        text: response.response,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       }]);
-    }, 1800);
-  };
+    } catch (err) {
+      setIsTyping(false);
+      setIsCreatingSession(false);
+      const errorMessage = getErrorMessage(err);
+      setError(errorMessage);
+      
+      // Remove the user message if sending failed
+      setMessages(prev => prev.filter(m => m.id !== userMsg.id));
+    }
+  }, [sessionId, isTyping, isCreatingSession]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -74,6 +150,14 @@ export default function AIChatPage() {
   return (
     <AppLayout role="seeker" anonId={user?.anonId}>
       <div className={styles.chatPage}>
+
+        {/* Error Banner */}
+        {error && (
+          <div className={styles.errorBanner}>
+            {error}
+            <button onClick={() => setError(null)}>×</button>
+          </div>
+        )}
 
         {/* Chat Header */}
         <div className={styles.chatHeader}>

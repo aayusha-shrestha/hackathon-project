@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import Navbar from '../components/layout/Navbar';
+import { useAuth } from '../context/AuthContext';
 import styles from './LandingPage.module.css';
 
 function TrustPillar({ icon, title, description }) {
@@ -24,6 +26,17 @@ function CommunityCard({ title, description }) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user) {
+      if (user.role === 'helper') {
+        navigate('/helper/dashboard', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [user, loading, navigate]);
 
   const handleHelperClick = () => {
     navigate('/helper/login');

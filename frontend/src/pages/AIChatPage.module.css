@@ -7,6 +7,28 @@
   overflow: hidden;
 }
 
+/* ── Error Banner ── */
+.errorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-bottom: 1px solid #fca5a5;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.errorBanner button {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #b91c1c;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
 /* ── Chat Header ── */
 .chatHeader {
   display: flex;

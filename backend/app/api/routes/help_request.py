@@ -1,25 +1,79 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
-from app.models.models import HelpSession, SessionStatus, User
+from app.api.deps import get_current_user, get_db
+from app.models.models import HelpSession, SessionStatus, User, UserAssessment
 from app.services.analyze import onboarding_assesment,analyze_conversation
-from app.schemas.schemas import HelpRequestSchema, AnalyzeRequest
+from app.schemas.schemas import HelpRequestSchema, AnalyzeRequest, AssessmentRequest
 from app.services.matching import find_available_helper
 from pydantic import BaseModel
 import uuid
 
 router = APIRouter(tags=["Help Request"], prefix="/api/v1")
 
-@router.post("/initial-assessment")
-def initial_assesment(data: AnalyzeRequest, db: Session = Depends(get_db)):
-    assessment_result = onboarding_assesment(data.conversation)
-    # This should now update in the users's intial assesment field in DB
-    user = db.query(User).filter(User.user_id == data.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+
+def store_user_assessments(db: Session, user_id: int, assessments: list) -> None:
+    """
+    Store individual question/answer pairs in UserAssessment table.
+    Clears existing assessments for the user before adding new ones.
+    """
+    # Delete existing assessments for this user
+    db.query(UserAssessment).filter(UserAssessment.user_id == user_id).delete()
+    
+    # Add new assessments
+    for item in assessments:
+        assessment = UserAssessment(
+            user_id=user_id,
+            question=item.question if hasattr(item, 'question') else item.get('question', ''),
+            answer=item.answer if hasattr(item, 'answer') else item.get('answer', '')
+        )
+        db.add(assessment)
+    
+    db.commit()
+
+
+def get_user_assessments_as_string(db: Session, user_id: int) -> str:
+    """
+    Retrieve user assessments and format as string for LLM context.
+    """
+    assessments = db.query(UserAssessment).filter(UserAssessment.user_id == user_id).all()
+    if not assessments:
+        return ""
+    
+    formatted = []
+    for a in assessments:
+        formatted.append(f"Q: {a.question}\nA: {a.answer}")
+    
+    return "\n\n".join(formatted)
+
+
+def process_initial_assessment(db: Session, user: User, conversation: str) -> dict:
+    """
+    Process initial assessment - analyze conversation and store results.
+    Can be called from initial-assessment endpoint or from chat when assessment is missing.
+    """
+    assessment_result = onboarding_assesment(conversation)
     user.initial_assesment = assessment_result
     db.commit()
+    return assessment_result
+
+
+@router.post("/assessments")
+def store_assessments(
+    data: AssessmentRequest, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Store individual question/answer pairs from onboarding.
+    """
+    store_user_assessments(db, current_user.user_id, data.assessments)
+    return {"message": "Assessments stored successfully", "count": len(data.assessments)}
+
+
+@router.post("/initial-assessment")
+def initial_assesment(data: AnalyzeRequest, db: Session = Depends(get_db),current_user : User = Depends(get_current_user)):
+    assessment_result = process_initial_assessment(db, current_user, data.conversation)
     return assessment_result
 
 @router.post("/analyze")
@@ -29,14 +83,14 @@ def analyze(data: AnalyzeRequest):
 
 
 @router.post("/request")
-def request_help(data:HelpRequestSchema, db: Session = Depends(get_db)):
+def request_help(data:HelpRequestSchema, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     helper=find_available_helper(data.domain,db)
     if not helper:
         raise HTTPException(status_code=404, detail="No helper available at the moment. Please try again later.")
     
     session=HelpSession(
         session_id=str(uuid.uuid4()),
-        user_id=data.user_id,
+        user_id=current_user.user_id,
         helper_id=helper.helper_id,
         status=SessionStatus.ACTIVE
     )

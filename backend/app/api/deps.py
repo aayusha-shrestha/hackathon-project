@@ -11,6 +11,7 @@ from app.db.session import engine
 from sqlalchemy.orm import sessionmaker, Session
 
 from app.models import  User
+from app.models.models import Helper
 from app.schemas import Token,TokenPayload
 from app.core.config import settings
 from app.core.security import decode_token, token_expired
@@ -59,3 +60,23 @@ def get_current_user(token:TokenDep,db:SessionDep) -> User:
             detail="User not found"
         )
     return user
+
+
+def get_current_helper(token: TokenDep, db: SessionDep) -> Helper:
+    try:
+        if token_expired(token):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is expired.")
+        token_data = decode_token(token)
+    except (JWTError, ValidationError):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        )
+
+    helper = db.query(Helper).filter(Helper.email == token_data['sub']).first()
+    if not helper:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Helper not found"
+        )
+    return helper

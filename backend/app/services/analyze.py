@@ -57,9 +57,8 @@ Analyze for:
    Options: {ALLOWED_DOMAINS}
    Use "general" if unclear or multiple areas equally affected.
 
-4. BRIEF SUMMARY - A compassionate, non-diagnostic summary (2-3 sentences)
+4. BRIEF SUMMARY - A  non-diagnostic summary (2-3 sentences) in third person for the user.
 
-5. RECOMMENDED ACTION - What type of support would be most helpful
 
 User's Questionnaire Responses:
 {user_input}
@@ -71,7 +70,6 @@ Return ONLY a JSON object in this exact format:
     "primary_concern": "main_concern",
     "domain": "relationship|financial|study|work|general",
     "summary": "Brief compassionate summary of the assessment",
-    "recommended_action": "Suggested next steps",
     "crisis_detected": true|false
 }}
 """
@@ -102,16 +100,16 @@ Return ONLY a JSON object in this exact format:
     # Ensure crisis_detected is boolean
     result["crisis_detected"] = bool(result.get("crisis_detected", False))
     
-    # If critical, ensure crisis resources are mentioned
-    if result["criticality"] == "critical" or result["crisis_detected"]:
-        result["crisis_resources"] = {
-            "message": "If you are in immediate danger, please contact emergency services or a crisis hotline.",
-            "hotlines": [
-                {"name": "Suicide prevention helpline", "number": "1166"},
-                {"name": "Crisis Text Line", "number": "Text to 9847386158 "},
-                {"name": "International Association for Suicide Prevention", "url": "https://www.iasp.info/resources/Crisis_Centres/"}
-            ]
-        }
+    # # If critical, ensure crisis resources are mentioned
+    # if result["criticality"] == "critical" or result["crisis_detected"]:
+    #     result["crisis_resources"] = {
+    #         "message": "If you are in immediate danger, please contact emergency services or a crisis hotline.",
+    #         "hotlines": [
+    #             {"name": "Suicide prevention helpline", "number": "1166"},
+    #             {"name": "Crisis Text Line", "number": "Text to 9847386158 "},
+    #             {"name": "International Association for Suicide Prevention", "url": "https://www.iasp.info/resources/Crisis_Centres/"}
+    #         ]
+    #     }
     
     return result
 

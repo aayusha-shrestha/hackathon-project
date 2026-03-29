@@ -6,6 +6,7 @@ from app.models import User, ChatHistory, ChatSession  # assuming your model fil
 from app.schemas import QueryRequestSchema
 from app.utils import rewrite_query
 from app.core.llm import get_chat_response
+from app.api.routes.help_request import get_user_assessments_as_string, process_initial_assessment
 
 
 def get_chatbot_response(query: str, chat_context: str = None, user_assessment: dict = None) -> str:
@@ -63,6 +64,17 @@ async def answer_query(session_id :str,
             detail="Session not found or not authorized"
         )
 
+        # Check if initial_assesment is null - if so, try to generate it from stored assessments
+        user_assessment = current_user.initial_assesment
+        if not user_assessment:
+            # Try to get assessments from UserAssessment table
+            assessments_string = get_user_assessments_as_string(db, current_user.user_id)
+            if assessments_string:
+                print(f"Generating initial assessment from stored Q&A for user {current_user.user_id}")
+                user_assessment = process_initial_assessment(db, current_user, assessments_string)
+                # Refresh current_user to get updated initial_assesment
+                db.refresh(current_user)
+
         # Create the user message object
         user_message = ChatHistory(session_id = session_id,
                                    role = "user",
@@ -91,14 +103,14 @@ async def answer_query(session_id :str,
 
         print("\nChat context is :: ", chat_context)
         #rewriting the query basedo on chat history context and current query
-        rewritten_query = rewrite_query(query = request.query, chat_context = chat_context)
-        print("\n Rewritten Query: ", rewritten_query)
+        # rewritten_query = rewrite_query(query = request.query, chat_context = chat_context)
+        # print("\n Rewritten Query: ", rewritten_query)
 
         # Get response from Gemini model (pass user's assessment for personalized responses)
         ai_response_text = get_chatbot_response(
-            query=rewritten_query, 
+            query=request.query, 
             chat_context=chat_context,
-            user_assessment=current_user.initial_assesment
+            user_assessment=user_assessment
         )
 
         print("\nAI Response:", ai_response_text)
